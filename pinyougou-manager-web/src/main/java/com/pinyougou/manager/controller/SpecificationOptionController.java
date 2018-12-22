@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.dubbo.config.annotation.Reference;
 import com.pinyougou.pojo.TbSpecificationOption;
-import com.pinyougou.sellergoods.SpecificationOptionService;
+import com.pinyougou.sellergoods.service.SpecificationOptionService;
 
 import entity.PageResult;
 import entity.Result;

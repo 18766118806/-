@@ -1,22 +1,21 @@
 package com.pinyougou.sellergoods.service.impl;
 
 import java.util.List;
+import java.util.Map;
 
 import com.pinyougou.mapper.TbSpecificationOptionMapper;
-import com.pinyougou.pojo.TbSpecificationOption;
-import com.pinyougou.pojo.TbSpecificationOptionExample;
+import com.pinyougou.pojo.*;
 import com.pinyougou.pojogroup.Specification;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.alibaba.dubbo.config.annotation.Service;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.pinyougou.mapper.TbSpecificationMapper;
-import com.pinyougou.pojo.TbSpecification;
-import com.pinyougou.pojo.TbSpecificationExample;
 import com.pinyougou.pojo.TbSpecificationExample.Criteria;
-import com.pinyougou.sellergoods.SpecificationService;
+import com.pinyougou.sellergoods.service.SpecificationService;
 
 import entity.PageResult;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 服务实现层
@@ -24,6 +23,7 @@ import entity.PageResult;
  * @author Administrator
  */
 @Service
+@Transactional
 public class SpecificationServiceImpl implements SpecificationService {
 
     @Autowired
@@ -112,6 +112,10 @@ public class SpecificationServiceImpl implements SpecificationService {
     public void delete(Long[] ids) {
         for (Long id : ids) {
             specificationMapper.deleteByPrimaryKey (id);
+            //删除规格的同时根据spex_id删除对应的规格选项
+            TbSpecificationOptionExample example = new TbSpecificationOptionExample ();
+            example.createCriteria ().andSpecIdEqualTo (id);
+            specificationOptionMapper.deleteByExample (example);
         }
     }
 
@@ -133,5 +137,11 @@ public class SpecificationServiceImpl implements SpecificationService {
         Page<TbSpecification> page = (Page<TbSpecification>) specificationMapper.selectByExample (example);
         return new PageResult (page.getTotal (), page.getResult ());
     }
+
+    @Override
+    public List<Map> selectOptionList() {
+        return specificationMapper.selectOptionList ();
+    }
+
 
 }

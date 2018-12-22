@@ -42,7 +42,7 @@ app.controller('sellerController' ,function($scope,$controller   ,sellerService)
 		serviceObject.success(
 			function(response){
 				if(response.success){
-					//重新查询 
+					//重新查询
 		        	$scope.reloadList();//重新加载
 				}else{
 					alert(response.message);
@@ -76,5 +76,22 @@ app.controller('sellerController' ,function($scope,$controller   ,sellerService)
 			}			
 		);
 	}
+
+	//审核商家
+	$scope.updateStatus=function(sellerId,status){
+		sellerService.updateStatus(sellerId,status).success(
+			function(response){
+                if(response.success){
+                    //重新查询
+					alert(response.message)
+                    $scope.reloadList();//重新加载
+                }else{
+                    alert(response.message);
+                }
+			}
+		);
+	}
+
+
     
 });	
