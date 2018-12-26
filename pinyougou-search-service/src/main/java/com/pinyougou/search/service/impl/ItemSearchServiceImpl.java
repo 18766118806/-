@@ -34,13 +34,17 @@ public class ItemSearchServiceImpl implements ItemSearchService {
     @Override
     public Map search(Map searchMap) {
         Map<String, java.lang.Object> map = new HashMap<> ();
-        //高亮显示
+        //查询列表
         Map<String, List<TbItem>> highLightList = searchHighLightList (searchMap);
         map.putAll (highLightList);
         //分组查询
         Map<String, List<String>> categoryList = searchCategoryList (searchMap);
         map.putAll (categoryList);
-        if (categoryList.get ("categoryList").size ()>0) {
+        //从缓存中查询品牌列表和规格及规格选项
+        String categoryName = (String) searchMap.get ("category");
+        if (!"".equals (categoryName)) {//如果有分类名称
+
+        } else if (categoryList.get ("categoryList").size () > 0) {
             Map<String, List<Object>> brandListAndSpecList = searchBrandListAndSpecList (categoryList.get ("categoryList").get (0));
             map.putAll (brandListAndSpecList);
         }
@@ -57,13 +61,42 @@ public class ItemSearchServiceImpl implements ItemSearchService {
     private Map<String, List<TbItem>> searchHighLightList(Map searchMap) {
         Map<String, List<TbItem>> map = new HashMap<String, List<TbItem>> ();
         HighlightQuery query = new SimpleHighlightQuery ();
+
+        //-------------高亮设置-------------
         HighlightOptions highlightOptions = new HighlightOptions ().addField ("item_title");//设置高亮的域
         highlightOptions.setSimplePrefix ("<em style='color:red'>");//高亮前缀
         highlightOptions.setSimplePostfix ("</em>");//高亮后缀
         query.setHighlightOptions (highlightOptions);//设置高亮选项
-        //按照关键字查询
+
+        //-------------关键字查询-----------
         Criteria criteria = new Criteria ("item_keywords").is (searchMap.get ("keywords"));
         query.addCriteria (criteria);
+
+        //--------------过滤查询(商品分类)------------
+        if (!"".equals (searchMap.get ("category"))) {
+            Criteria filterCriteria = new Criteria ("item_category").is (searchMap.get ("category"));
+            FilterQuery filterQuery = new SimpleFilterQuery (filterCriteria);
+            query.addFilterQuery (filterQuery);
+        }
+
+        //---------过滤查询(品牌)----------------
+        if (!"".equals (searchMap.get ("brand"))) {
+            Criteria filterCriteria = new
+                    Criteria ("item_brand").is (searchMap.get ("brand"));
+            FilterQuery filterQuery = new SimpleFilterQuery (filterCriteria);
+            query.addFilterQuery (filterQuery);
+        }
+
+        //-------------过滤查询(规格过滤)---------------
+        if (searchMap.get ("spec") != null) {
+            Map<String, String> specMap = (Map) searchMap.get ("spec");
+            for (String key : specMap.keySet ()) {
+                Criteria filterCriteria = new Criteria ("item_spec_" + key).is (specMap.get (key));
+                FilterQuery filterQuery = new SimpleFilterQuery (filterCriteria);
+                query.addFilterQuery (filterQuery);
+            }
+        }
+
         HighlightPage<TbItem> page = solrTemplate.queryForHighlightPage (query, TbItem.class);
         for (HighlightEntry<TbItem> h : page.getHighlighted ()) {//循环高亮入口集合
             TbItem item = h.getEntity ();//获取原实体类
@@ -110,18 +143,19 @@ public class ItemSearchServiceImpl implements ItemSearchService {
 
     /**
      * 根据分类名称查询品牌列表以及规格选,规格选项
+     *
      * @param categoryName
      */
-    private Map<String, List<Object>> searchBrandListAndSpecList (String categoryName) {
+    private Map<String, List<Object>> searchBrandListAndSpecList(String categoryName) {
         Map<String, List<Object>> map = new HashMap<> ();
         Long typeId = (Long) redisTemplate.boundHashOps ("categoryList").get (categoryName);
-        if (typeId==null){
+        if (typeId == null) {
             return null;
         }
         List<Object> brandList = (List<Object>) redisTemplate.boundHashOps ("brandList").get (typeId);
-        map.put ("brandList",brandList);
+        map.put ("brandList", brandList);
         List<Object> specList = (List<Object>) redisTemplate.boundHashOps ("specList").get (typeId);
-        map.put ("specList",specList);
+        map.put ("specList", specList);
         return map;
     }
 }
