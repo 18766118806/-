@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>pinyougou.content.interface</artifactId>
+    <artifactId>pinyougou-content-interface</artifactId>
     <dependencies>
         <dependency>
             <groupId>com.pinyougou</groupId>

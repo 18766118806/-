@@ -110,7 +110,7 @@ public class TypeTemplateController {
     /**
      * 查询+分页
      *
-     * @param brand
+     * @param
      * @param page
      * @param rows
      * @return
@@ -121,7 +121,8 @@ public class TypeTemplateController {
     }
 
     /**
-     *  查询规格及规格选项
+     * 查询规格及规格选项
+     *
      * @param id
      * @return
      */
