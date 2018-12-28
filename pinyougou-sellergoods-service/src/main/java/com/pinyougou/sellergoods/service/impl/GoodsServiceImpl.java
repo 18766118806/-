@@ -1,5 +1,6 @@
 package com.pinyougou.sellergoods.service.impl;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -288,6 +289,25 @@ public class GoodsServiceImpl implements GoodsService {
             goods.setIsMarketable (status);
             goodsMapper.updateByPrimaryKey (goods);
         }
+    }
+
+    /**
+     * 根据商品id查询sku列表
+     *
+     * @param ids
+     * @return
+     */
+    @Override
+    public List<TbItem> selectItemByGoodsId(Long[] ids) {
+        List<TbItem> list = new ArrayList<> ();
+        TbItemExample example = new TbItemExample ();
+
+        for (Long goodsid : ids) {
+            example.createCriteria ().andGoodsIdEqualTo (goodsid);
+            List<TbItem> itemList = itemMapper.selectByExample (example);
+            list.addAll (itemList);
+        }
+        return list;
     }
 
 }

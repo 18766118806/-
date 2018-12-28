@@ -2,7 +2,10 @@ package com.pinyougou.manager.controller;
 
 import java.util.List;
 
+import com.pinyougou.page.service.ItemPageService;
+import com.pinyougou.pojo.TbItem;
 import com.pinyougou.pojogroup.Goods;
+import com.pinyougou.search.service.ItemSearchService;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +27,10 @@ public class GoodsController {
 
     @Reference
     private GoodsService goodsService;
+    @Reference
+    private ItemSearchService itemSearchService;
+    @Reference
+    private ItemPageService itemPageService;
 
     /**
      * 返回全部列表
@@ -101,6 +108,7 @@ public class GoodsController {
     public Result delete(Long[] ids) {
         try {
             goodsService.delete (ids);
+            itemSearchService.deleteList (ids);
             return new Result (true, "删除成功");
         } catch (Exception e) {
             e.printStackTrace ();
@@ -132,12 +140,24 @@ public class GoodsController {
     public Result updateStatus(Long[] ids, String status) {
         try {
             goodsService.updateStatus (ids, status);
+            //更新到索引库
+            if ("1".equals (status)) {
+                List<TbItem> itemList = goodsService.selectItemByGoodsId (ids);
+                if (itemList.size ()>0&&itemList!=null){
+                    itemSearchService.importList (itemList);
+                }
+
+            }
             return new Result (true, "审核成功");
         } catch (Exception e) {
             e.printStackTrace ();
             return new Result (false, "审核失败");
         }
 
+    }
+    @RequestMapping("/genHtml")
+    public void genHtml(Long goodsId){
+        itemPageService.genItemHtml (goodsId);
     }
 }
 

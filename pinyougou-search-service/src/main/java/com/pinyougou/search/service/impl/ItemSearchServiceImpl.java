@@ -3,18 +3,16 @@ package com.pinyougou.search.service.impl;
 import com.alibaba.dubbo.config.annotation.Service;
 import com.pinyougou.pojo.TbItem;
 import com.pinyougou.search.service.ItemSearchService;
-import org.omg.CORBA.Object;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.solr.core.SolrTemplate;
 import org.springframework.data.solr.core.query.*;
 import org.springframework.data.solr.core.query.result.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /*
  * @Author:  Yajun_Xu
@@ -31,35 +29,69 @@ public class ItemSearchServiceImpl implements ItemSearchService {
     @Autowired
     private RedisTemplate redisTemplate;
 
+    /**
+     * 主线方法
+     *
+     * @param searchMap
+     * @return
+     */
     @Override
     public Map search(Map searchMap) {
-        Map<String, java.lang.Object> map = new HashMap<> ();
+        HashMap<String, Object> map = new HashMap<> ();
         //查询列表
-        Map<String, List<TbItem>> highLightList = searchHighLightList (searchMap);
+        Map<String, Object> highLightList = searchHighLightList (searchMap);
         map.putAll (highLightList);
-        //分组查询
+        //分组查询,查询分类列表
         Map<String, List<String>> categoryList = searchCategoryList (searchMap);
         map.putAll (categoryList);
         //从缓存中查询品牌列表和规格及规格选项
         String categoryName = (String) searchMap.get ("category");
         if (!"".equals (categoryName)) {//如果有分类名称
-
-        } else if (categoryList.get ("categoryList").size () > 0) {
+            Map<String, List<Object>> brandListAndSpecList = searchBrandListAndSpecList (categoryName);
+            assert brandListAndSpecList != null;
+            map.putAll (brandListAndSpecList);
+        } else if (categoryList.get ("categoryList").size () > 0) {//没有分类名称,默认用第一个
             Map<String, List<Object>> brandListAndSpecList = searchBrandListAndSpecList (categoryList.get ("categoryList").get (0));
+            assert brandListAndSpecList != null;
             map.putAll (brandListAndSpecList);
         }
         return map;
 
     }
 
+
     /**
-     * 高亮显示
+     * 商品审核通过后更新到索引库
+     *
+     * @param itemList
+     */
+    @Override
+    public void importList(List itemList) {
+        solrTemplate.saveBeans (itemList);
+        solrTemplate.commit ();
+    }
+
+    /**
+     * 根据商品id删除索引
+     */
+    @Override
+    public void deleteList(Long[] goodsIds) {
+        SolrDataQuery query = new SimpleQuery ("*:*");
+        Criteria criteria = new Criteria ("item_goodsid");
+        criteria.in (goodsIds);
+        query.addCriteria (criteria);
+        solrTemplate.delete (query);
+        solrTemplate.commit ();
+    }
+
+    /**
+     * 查询列表
      *
      * @param searchMap
      * @return
      */
-    private Map<String, List<TbItem>> searchHighLightList(Map searchMap) {
-        Map<String, List<TbItem>> map = new HashMap<String, List<TbItem>> ();
+    private Map<String, Object> searchHighLightList(Map searchMap) {
+        Map<String, Object> map = new HashMap<> ();
         HighlightQuery query = new SimpleHighlightQuery ();
 
         //-------------高亮设置-------------
@@ -69,17 +101,21 @@ public class ItemSearchServiceImpl implements ItemSearchService {
         query.setHighlightOptions (highlightOptions);//设置高亮选项
 
         //-------------关键字查询-----------
-        Criteria criteria = new Criteria ("item_keywords").is (searchMap.get ("keywords"));
-        query.addCriteria (criteria);
+        String keywords = (String) searchMap.get ("keywords");
+        if (!"".equals (keywords) && keywords != null) {
+            keywords = keywords.replace (" ", "");
+            Criteria criteria = new Criteria ("item_keywords").is (keywords);
+            query.addCriteria (criteria);
+        }
 
-        //--------------过滤查询(商品分类)------------
+        //------------添加商品分类过滤条件------------
         if (!"".equals (searchMap.get ("category"))) {
             Criteria filterCriteria = new Criteria ("item_category").is (searchMap.get ("category"));
             FilterQuery filterQuery = new SimpleFilterQuery (filterCriteria);
             query.addFilterQuery (filterQuery);
         }
 
-        //---------过滤查询(品牌)----------------
+        //-------------添加品牌过滤条件----------------
         if (!"".equals (searchMap.get ("brand"))) {
             Criteria filterCriteria = new
                     Criteria ("item_brand").is (searchMap.get ("brand"));
@@ -87,7 +123,7 @@ public class ItemSearchServiceImpl implements ItemSearchService {
             query.addFilterQuery (filterQuery);
         }
 
-        //-------------过滤查询(规格过滤)---------------
+        //-------------添加规格过滤条件---------------
         if (searchMap.get ("spec") != null) {
             Map<String, String> specMap = (Map) searchMap.get ("spec");
             for (String key : specMap.keySet ()) {
@@ -96,7 +132,55 @@ public class ItemSearchServiceImpl implements ItemSearchService {
                 query.addFilterQuery (filterQuery);
             }
         }
+        //---------添加价格过滤条件---------------
+        if (searchMap.get ("price") != null && !"".equals (searchMap.get ("price"))) {
+            String price = (String) searchMap.get ("price");
+            String[] prices = price.split ("-");
+            if (!"0".equals (prices[0])) { //添加下限
+                Integer firstPrice = Integer.parseInt (prices[0]);
+                Criteria filterCriteria = new Criteria ("item_price").greaterThanEqual (firstPrice);
+                FilterQuery filterQuery = new SimpleFilterQuery (filterCriteria);
+                query.addFilterQuery (filterQuery);
+            }
+            if (!"#".equals (prices[1])) { //上限
+                Integer lastPrice = Integer.parseInt (prices[1]);
+                Criteria filterCriteria = new Criteria ("item_price").lessThanEqual (lastPrice);
+                FilterQuery filterQuery = new SimpleFilterQuery (filterCriteria);
+                query.addFilterQuery (filterQuery);
+            }
+        }
 
+        //-------------分页查询-----------------------
+        Integer pageNo = (Integer) searchMap.get ("pageNo");
+        Integer pageSize = (Integer) searchMap.get ("pageSize");
+        if ("".equals (pageNo) || pageNo == null || pageNo < 0) {
+            pageNo = 1;
+        }
+        if ("".equals (pageSize) || pageSize == null) {
+            pageSize = 20;
+        }
+        //开始索引
+        query.setOffset ((pageNo - 1) * pageSize);
+        //每页显示条数
+        query.setRows (pageSize);
+
+
+        //----------------排序-------------------
+        String sortValue = (String) searchMap.get ("sort");//ASC DESC
+        String sortField = (String) searchMap.get ("sortField");//排序字段
+        if (sortValue != null && "".equals (sortValue)) {
+            if (sortValue.equals ("ASC")) {
+                Sort sort = new Sort (Sort.Direction.ASC, "item_" + sortField);
+                query.addSort (sort);
+            }
+            if (sortValue.equals ("DESC")) {
+                Sort sort = new Sort (Sort.Direction.DESC, "item_" + sortField);
+                query.addSort (sort);
+            }
+        }
+
+
+        //----------执行查询并获取结果集--------------------
         HighlightPage<TbItem> page = solrTemplate.queryForHighlightPage (query, TbItem.class);
         for (HighlightEntry<TbItem> h : page.getHighlighted ()) {//循环高亮入口集合
             TbItem item = h.getEntity ();//获取原实体类
@@ -105,6 +189,8 @@ public class ItemSearchServiceImpl implements ItemSearchService {
             }
         }
         map.put ("rows", page.getContent ());
+        map.put ("totalPages", page.getTotalPages ());
+        map.put ("total", page.getTotalElements ());
         return map;
     }
 

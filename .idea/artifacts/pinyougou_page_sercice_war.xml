@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="war" name="pinyougou-page-sercice:war">
+    <output-path>$PROJECT_DIR$/pinyougou-page-sercice/target</output-path>
+    <root id="archive" name="pinyougou-page-sercice-1.0-SNAPSHOT.war">
+      <element id="artifact" artifact-name="pinyougou-page-sercice:war exploded" />
+    </root>
+  </artifact>
+</component>

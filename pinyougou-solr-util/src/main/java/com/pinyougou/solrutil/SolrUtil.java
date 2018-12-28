@@ -40,9 +40,9 @@ private SolrTemplate solrTemplate;
             Map map = JSON.parseObject (spec, Map.class);
             item.setSpecMap (map);
         }
-        solrTemplate.saveBeans (items);
+    /* solrTemplate.saveBeans (items);*/
        Query query=new SimpleQuery ("*:*");
-     //   solrTemplate.delete (query);
+       solrTemplate.delete (query);
         solrTemplate.commit ();
         ScoredPage<TbItem> tbItems = solrTemplate.queryForPage (query, TbItem.class);
         System.out.println (tbItems.getTotalElements ());

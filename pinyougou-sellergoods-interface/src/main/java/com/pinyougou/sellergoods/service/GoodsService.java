@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.pinyougou.pojo.TbGoods;
 
+import com.pinyougou.pojo.TbItem;
 import com.pinyougou.pojogroup.Goods;
 import entity.PageResult;
 
@@ -80,5 +81,12 @@ public interface GoodsService {
      *
      * @param ids
      */
-    public void isMarketable(Long[] ids ,String status);
+    public void isMarketable(Long[] ids, String status);
+
+    /**
+     * 根据商品ids 查询sku 列表
+     * @param ids
+     * @return
+     */
+    public List<TbItem> selectItemByGoodsId(Long[] ids);
 }
