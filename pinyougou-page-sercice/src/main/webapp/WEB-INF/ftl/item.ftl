@@ -12,10 +12,29 @@
     <link rel="stylesheet" type="text/css" href="css/pages-item.css"/>
     <link rel="stylesheet" type="text/css" href="css/pages-zoom.css"/>
     <link rel="stylesheet" type="text/css" href="css/widget-cartPanelView.css"/>
+
+    <script type="text/javascript" src="plugins/angularjs/angular.min.js"> </script>
+    <script type="text/javascript" src="js/base.js"> </script>
+    <script type="text/javascript" src="js/controller/itemController.js"> </script>
+
+    <script>
+        //SKU 商品列表
+        var skuList=[
+  <#list itemList as item>
+ {
+    "id":${item.id?c},
+    "title":"${item.title!''}",
+    "price":${item.price?c},
+    "spec": ${item.spec}
+ },
+</#list>
+        ];
+    </script>
+
 </head>
 
 
-<body>
+<body ng-app="pinyougou" ng-controller="itemController" ng-init="num=1 ;loadSkuList()">
 
 <!--页面顶部 开始-->
 <#include "head.ftl"/>
@@ -28,15 +47,15 @@
         <div class="crumb-wrap">
             <ul class="sui-breadcrumb">
                 <li>
-                    <a href="#">手机、数码、通讯</a>
+                    <a href="#">${category1Name}</a>
                 </li>
                 <li>
-                    <a href="#">手机</a>
+                    <a href="#">${category2Name}</a>
                 </li>
                 <li>
-                    <a href="#">Apple苹果</a>
+                    <a href="#">${category3Name}</a>
                 </li>
-                <li class="active">iphone 6S系类</li>
+
             </ul>
         </div>
         <!--product-info-->
@@ -68,7 +87,7 @@
             </div>
             <div class="fr itemInfo-wrap">
                 <div class="sku-name">
-                    <h4>${goods.goodsName}</h4>
+                    <h4>{{sku.title}}</h4>
                 </div>
                 <div class="news"><span>${goods.caption}</span></div>
                 <div class="summary">
@@ -78,7 +97,7 @@
                         </div>
                         <div class="fl price">
                             <i>¥</i>
-                            <em>${goods.price}</em>
+                            <em>{{sku.price}}</em>
                             <span>降价通知</span>
                         </div>
                         <div class="fr remark">
@@ -125,8 +144,12 @@
                                     </dt>
 								<#list spec.attributeValue as value >
 								<dd>
-                                    <a href="javascript:;" class="selected">${value}<span title="点击取消选择">&nbsp;</span>
+                                    <a  ng-click="selectSpecification('${spec.attributeName}','${value}')"
+                                        href="javascript:;"
+                                        class="{{isSelected('${spec.attributeName}','${value}')?'selected':''}}">
+                                        ${value}<span title="点击取消选择">&nbsp;</span>
                                 </a>
+
                                 </dd>
                                 </#list >
                                 </dl>
@@ -138,16 +161,16 @@
                         <div class="fl title">
                             <div class="control-group">
                                 <div class="controls">
-                                    <input autocomplete="off" type="text" value="1" minnum="1" class="itxt"/>
-                                    <a href="javascript:void(0)" class="increment plus">+</a>
-                                    <a href="javascript:void(0)" class="increment mins">-</a>
+                                    <input autocomplete="off"  type="text" value="{{num}}" minnum="1" class="itxt"/>
+                                    <a ng-click="addNum(1)" href="javascript:void(0)" class="increment plus">+</a>
+                                    <a ng-click="addNum(-1)" href="javascript:void(0)" class="increment mins">-</a>
                                 </div>
                             </div>
                         </div>
                         <div class="fl">
                             <ul class="btn-choose unstyled">
                                 <li>
-                                    <a href="cart.html" target="_blank" class="sui-btn  btn-danger addshopcar">加入购物车</a>
+                                    <a ng-click="addToCat()"  <#--href="cart.html"--> target="_blank" class="sui-btn  btn-danger addshopcar">加入购物车</a>
                                 </li>
                             </ul>
                         </div>
@@ -198,7 +221,7 @@
                                         </strong>
                                     </div>
                                     <div class="operate">
-                                        <a href="javascript:void(0);" class="sui-btn btn-bordered">加入购物车</a>
+                                        <a  href="javascript:void(0);" class="sui-btn btn-bordered">加入购物车</a>
                                     </div>
                                 </div>
                             </li>

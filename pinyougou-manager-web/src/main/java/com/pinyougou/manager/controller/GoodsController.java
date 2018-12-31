@@ -1,11 +1,17 @@
 package com.pinyougou.manager.controller;
 
+
+import java.util.Arrays;
 import java.util.List;
 
-import com.pinyougou.page.service.ItemPageService;
+import com.alibaba.fastjson.JSON;
+
 import com.pinyougou.pojo.TbItem;
 import com.pinyougou.pojogroup.Goods;
-import com.pinyougou.search.service.ItemSearchService;
+import org.apache.activemq.command.ActiveMQDestination;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.jms.core.MessageCreator;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,6 +21,10 @@ import com.pinyougou.sellergoods.service.GoodsService;
 
 import entity.PageResult;
 import entity.Result;
+
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.Session;
 
 /**
  * controller
@@ -27,10 +37,16 @@ public class GoodsController {
 
     @Reference
     private GoodsService goodsService;
-    @Reference
-    private ItemSearchService itemSearchService;
-    @Reference
-    private ItemPageService itemPageService;
+    @Autowired
+    private JmsTemplate jmsTemplate;
+    @Autowired
+    private ActiveMQDestination queueSolrAddDestination;  //点对点 ,solr 添加
+    @Autowired
+    private ActiveMQDestination queueSolrDeleteDestination;  //点对点 ,solr 删除
+    @Autowired
+    private ActiveMQDestination topicFreemarkerAddDestination;   //静态页面生成
+    @Autowired
+    private ActiveMQDestination topicFreemarkerDeleteDestination;   //静态页面删除
 
     /**
      * 返回全部列表
@@ -105,10 +121,24 @@ public class GoodsController {
      * @return
      */
     @RequestMapping("/delete")
-    public Result delete(Long[] ids) {
+    public Result delete(final Long[] ids) {
         try {
+            //更新数据库
             goodsService.delete (ids);
-            itemSearchService.deleteList (ids);
+            // 更新索引库 , 一对一
+            jmsTemplate.send (queueSolrDeleteDestination, new MessageCreator () {
+                @Override
+                public Message createMessage(Session session) throws JMSException {
+                    return session.createObjectMessage (ids);
+                }
+            });
+            //删除静态页面  , 广播
+            jmsTemplate.send (topicFreemarkerDeleteDestination, new MessageCreator () {
+                @Override
+                public Message createMessage(Session session) throws JMSException {
+                    return session.createTextMessage (Arrays.toString (ids));
+                }
+            });
             return new Result (true, "删除成功");
         } catch (Exception e) {
             e.printStackTrace ();
@@ -137,17 +167,37 @@ public class GoodsController {
      * @return
      */
     @RequestMapping("/updateStatus")
-    public Result updateStatus(Long[] ids, String status) {
+    public Result updateStatus(final Long[] ids, String status) {
         try {
             goodsService.updateStatus (ids, status);
             //更新到索引库
             if ("1".equals (status)) {
-                List<TbItem> itemList = goodsService.selectItemByGoodsId (ids);
-                if (itemList.size ()>0&&itemList!=null){
-                    itemSearchService.importList (itemList);
+                final List<TbItem> itemList = goodsService.selectItemByGoodsId (ids);
+                if (itemList.size () > 0) {
+                    final String itemListStr = JSON.toJSONString (itemList);
+                    jmsTemplate.send (queueSolrAddDestination, new MessageCreator () {
+                        @Override
+                        public Message createMessage(Session session) throws JMSException {
+                            return session.createTextMessage (itemListStr);
+                        }
+                    });
+
+                    //生成静态页面
+                    for (final Long goodsId : ids) {
+                        //  itemPageService.genItemHtml (goodsId);
+                        jmsTemplate.send (topicFreemarkerAddDestination, new MessageCreator () {
+                            @Override
+                            public Message createMessage(Session session) throws JMSException {
+                                return session.createTextMessage (goodsId + "");
+                            }
+                        });
+                    }
                 }
 
+
             }
+
+
             return new Result (true, "审核成功");
         } catch (Exception e) {
             e.printStackTrace ();
@@ -155,9 +205,16 @@ public class GoodsController {
         }
 
     }
+
+
+    /**
+     * 测试
+     *
+     * @param goodsId
+     */
     @RequestMapping("/genHtml")
-    public void genHtml(Long goodsId){
-        itemPageService.genItemHtml (goodsId);
+    public void genHtml(Long goodsId) {
+        // itemPageService.genItemHtml (goodsId);
     }
 }
 
